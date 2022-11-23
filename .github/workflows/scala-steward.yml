@@ -1,0 +1,27 @@
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+
+name: Launch Scala Steward
+
+jobs:
+  scala-steward:
+    runs-on: ubuntu-latest
+    name: Launch Scala Steward
+    steps:
+    - name: Generate token
+      id: generate-token
+      uses: tibdex/github-app-token@v1
+      with:
+        app_id: ${{ secrets.APP_ID }}
+        private_key: ${{ secrets.APP_PRIVATE_KEY }}
+    - name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        java-version: 11
+        distribution: zulu
+    - name: Launch Scala Steward
+      uses: scala-steward-org/scala-steward-action@v2
+      with:
+        github-token: ${{ secrets.REPO_GITHUB_TOKEN }}
+        author-email: scala-steward@noreply.github.com
