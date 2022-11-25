@@ -1,6 +1,6 @@
 # Cardan
 
-Postgres to kafka capture
+Postgres change to kafka capture, licensed in Apache 2
 
 
 # Dependencies
