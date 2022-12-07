@@ -113,14 +113,14 @@ object ChangeFilter {
     override def pass(x: Record): Option[ProduceRecord[Key, Value, Passthrough]] = {
       filtering(x.data)
         .guard[Option]
-        .as(
+        .map { _ =>
           ProduceRecord(
             topic       = topicFor(x.data),
             key         = keyFor(x.data),
             value       = valueFor(x.data),
             passthrough = x.lsn
           )
-        )
+        }
     }
 
   }
