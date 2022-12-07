@@ -5,13 +5,13 @@ import cats.effect.*
 import io.circe.generic.JsonCodec
 import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts
-import fs2.{Pipe, Stream}
+import fs2.{Stream, Pipe}
 import io.circe.Json
 import org.apache.kafka.clients.producer.KafkaProducer
 
 import java.util
-import scala.concurrent.duration.*
 import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.*
 
 object Main extends IOApp.Simple {
   implicit val loggerFactory: LoggerFactory[IO] = LoggerFactory.default[IO]
@@ -43,7 +43,10 @@ object Main extends IOApp.Simple {
     val kBatchSize  = config.kafka.batch_size
     val pgBatchSize = config.postgres.batch_buffer * config.postgres.batch_size
 
-    val source: Stream[IO, Record] = pgReader.readBatch.repeat.buffer(pgBatchSize)
+    val source: Stream[IO, Record] =
+      pgReader.readBatch.repeat
+        .groupWithin(pgBatchSize, 10.millis)
+        .unchunks
 
     val sink: Pipe[IO, Record, Unit] =
       _.map(changeFilter.pass).unNone
@@ -130,7 +133,8 @@ case class Configuration(
 
 @JsonCodec
 case class TopicConfig(
-  prefix: String,
+  name: Option[String],
+  prefix: Option[String],
   filter: Option[TableFilter]
 )
 

@@ -30,11 +30,15 @@ object Record {
     table: Option[String],
     timestamp: Option[String],
     identity: Option[Vector[Column]],
-    columns: Option[Vector[Column]]
+    columns: Option[Vector[Column]],
+    pk: Option[Vector[ColumnDef]]
   )
 
   implicit val changeGet: doobie.Get[Change] = pgDecoderGetT[Change]
   implicit val changePut: doobie.Put[Change] = pgEncoderPutT[Change]
+
+  @JsonCodec
+  case class ColumnDef(name: String, `type`: String)
 
   @JsonCodec
   case class Column(
@@ -94,6 +98,8 @@ object PgReader {
               null :: pg_lsn,
               ${config.batch_size} :: integer,
               'include-timestamp', 'true',
+              'include-types', 'true',
+              'include-pk', 'true',
               'format-version', '2'
             )
         """

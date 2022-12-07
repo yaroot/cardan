@@ -32,7 +32,14 @@ trait ChangeFilter {
 
 object ChangeFilter {
   def apply(config: TopicConfig): ChangeFilter = new ChangeFilter {
-    val topicPrefix: String = config.prefix
+    require(config.name.isDefined || config.prefix.isDefined)
+    require(!(config.name.isDefined && config.prefix.isDefined))
+
+    def topic(schema: String, table: String): String = {
+      config.name
+        .orElse(config.prefix.map(x => s"$x-$schema-$table"))
+        .getOrElse(throw new NotImplementedError("not possible"))
+    }
 
     val filtering: (Record.Change => Boolean) = {
       def hasTable(x: Record.Change) = x.table.nonEmpty && x.schema.nonEmpty
@@ -59,23 +66,41 @@ object ChangeFilter {
 
     def topicFor(x: Record.Change): String = {
       (x.schema, x.table) match {
-        case (Some(sch), Some(tab)) => s"$topicPrefix-$sch-$tab"
-        case _                      => topicPrefix // not gonna happen
+        case (Some(sch), Some(tab)) => topic(sch, tab)
+        case _                      => throw new NotImplementedError("not possible")
       }
     }
 
     def keyFor(x: Record.Change): Json = {
-      x.identity.getOrElse(Vector.empty).map(_.standardize).asJson
+      def fromPk(pk: Vector[Record.ColumnDef]): Json            = {
+        val pkColumnSource =
+          x.identity
+            .orElse(x.columns)
+            .getOrElse(Vector.empty)
+        pk.map { key =>
+          pkColumnSource
+            .find(x => x.name == key.name && x.`type` == key.`type`)
+            .map(_.standardize)
+        }.asJson
+      }
+      def fromIdentity(identities: Vector[Record.Column]): Json = {
+        identities.map(_.standardize).asJson
+      }
+
+      if (x.columns.getOrElse(Vector.empty).nonEmpty)
+        x.pk
+          .map(fromPk)
+          .orElse(x.identity.map(fromIdentity))
+          .getOrElse(Json.arr())
+      else
+        x.identity.map(fromIdentity).getOrElse(Json.arr())
     }
 
     def valueFor(x: Record.Change): CapturedValue = {
-      val columns = x.columns
-        .getOrElse(Vector.empty)
-        .map { c =>
-          c.name -> c.standardize
-        }
-        .toMap
-        .asJson
+      val columns =
+        x.columns.map {
+          _.map { c => c.name -> c.standardize }.toMap
+        }.asJson
 
       CapturedValue(
         timestamp = x.timestamp,
