@@ -12,7 +12,7 @@ val Log4CatsVersion    = "2.5.0"
 val LogbackVersion     = "1.4.5"
 val MUnitVersion       = "0.7.29"
 val PostgresqlVersion  = "42.5.1"
-val WartremoverVersion = "3.0.6"
+val WartremoverVersion = "3.0.7"
 
 val ScalaVersion = "2.13.8"
 
