@@ -150,13 +150,14 @@ case class PgConfig(
   url: String,
   user: String,
   pass: String,
-  pool_size: Option[Int],
-  max_lifetime_seconds: Option[Long],
-  idle_timeout_seconds: Option[Long],
+  numeric_as_string: Option[Boolean], // defaults to false
+  pool_size: Option[Int],             // defaults to 3
+  max_lifetime_seconds: Option[Long], // defaults to 5 minutes
+  idle_timeout_seconds: Option[Long], // defaults to 15 seconds
   batch_size: Int,
   batch_buffer: Int,
   slot_name: String,
-  data_slot_name: Option[String]
+  data_slot_name: Option[String]      // defaults to {slot_name}_read
 )
 
 @JsonCodec

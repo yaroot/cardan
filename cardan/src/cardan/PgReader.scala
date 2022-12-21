@@ -87,12 +87,16 @@ object PgReader {
         >> copySlot(logicalSlot, dataSlot).transact(xa)
     }
 
-    override def readBatch: Stream[F, Record] = {
-      // TODO, sleep() if empty? (pg_current_wal_insert_lsn() for latest lsn)
-      Stream.eval(logger.trace("read batch")) >>
+    val readSql: doobie.Fragment = {
+      val numericAsString =
+        if (config.numeric_as_string.exists(identity))
+          fr0" 'numeric-data-types-as-string', 'true', "
+        else
+          fr0""
+
+      (
         sql"""
-          select lsn::text, data :: jsonb
-          from
+          select lsn::text, data :: jsonb from
             pg_logical_slot_get_changes(
               ${dataSlot} :: text,
               null :: pg_lsn,
@@ -100,9 +104,15 @@ object PgReader {
               'include-timestamp', 'true',
               'include-types', 'true',
               'include-pk', 'true',
-              'format-version', '2'
-            )
-        """
+          """
+          ++ numericAsString
+          ++ fr0" 'format-version', '2') "
+      )
+    }
+
+    override def readBatch: Stream[F, Record] = {
+      Stream.eval(logger.trace("read batch")) >>
+        readSql
           .query[Record]
           .stream
           .transact(xa)
