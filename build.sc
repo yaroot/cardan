@@ -1,6 +1,7 @@
 import mill._
 import mill.scalalib._
 import mill.define._
+import mill.scalalib.scalafmt.ScalafmtModule
 
 val CatsEffectVersion  = "3.4.4"
 val CirceVersion       = "0.14.3"
@@ -118,9 +119,11 @@ object Shared {
   )
 }
 
-object cardan extends ScalaModule {
+trait CommonScalaModule extends ScalaModule with ScalafmtModule {
   override def scalaVersion: T[String] = T(ScalaVersion)
+}
 
+object cardan extends CommonScalaModule {
   override def scalacOptions: Target[Seq[String]] = T(Shared.scalacOptions)
   override def compileIvyDeps                     = T(Shared.Deps.wartremover)
   override def scalacPluginIvyDeps                = T(Shared.Deps.wartremover)
