@@ -59,8 +59,8 @@ object Record {
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def unsafeParseNestedJsonString(value: Json): Json = {
-    (value.asString
-      .getOrElse(throw new RuntimeException("json/jsonb value is not string encoded")))
+    value.asString
+      .getOrElse(throw new RuntimeException("json/jsonb value is not string encoded"))
       .pipe(Jawn.parse(_).fold(throw _, identity))
   }
 }
