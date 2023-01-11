@@ -43,10 +43,12 @@ object Main extends IOApp.Simple {
     val kBatchSize  = config.kafka.batch_size
     val pgBatchSize = config.postgres.batch_buffer * config.postgres.batch_size
 
-    val source: Stream[IO, Record] =
-      pgReader.readBatch.repeat
-        .groupWithin(pgBatchSize, 10.millis)
-        .unchunks
+    val source: Stream[IO, Record] = Stream
+      .eval(pgReader.readBatch)
+      .repeat
+      .flatMap(Stream.emits)
+      .groupWithin(pgBatchSize, 10.millis)
+      .unchunks
 
     val sink: Pipe[IO, Record, Unit] =
       _.map(changeFilter.pass).unNone

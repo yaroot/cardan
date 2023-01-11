@@ -10,7 +10,6 @@ import io.circe.generic.JsonCodec
 import io.circe.syntax.*
 import io.circe.Printer
 import io.circe.jawn as Jawn
-import fs2.Stream
 
 import scala.concurrent.duration.*
 import scala.util.chaining.*
@@ -50,6 +49,7 @@ object Record {
     @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
     def standardize: Json = {
       `type` match {
+        case _ if value.isNull         => value                               // null
         case "bytea" if value.isString => ("\\x" + value.asString.get).asJson // safe
         case "json" | "jsonb"          => unsafeParseNestedJsonString(value)  // also safe
         case _                         => value
@@ -59,14 +59,15 @@ object Record {
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def unsafeParseNestedJsonString(value: Json): Json = {
-    (value.asString.get)
+    (value.asString
+      .getOrElse(throw new RuntimeException("json/jsonb value is not string encoded")))
       .pipe(Jawn.parse(_).fold(throw _, identity))
   }
 }
 
 trait PgReader[F[_]] {
   def resetDataSlot: F[Unit]
-  def readBatch: Stream[F, Record]
+  def readBatch: F[Vector[Record]]
   def commitSlot(lsn: String): F[Unit]
 }
 
@@ -112,7 +113,7 @@ object PgReader {
       )
     }
 
-    override def readBatch: Stream[F, Record] = {
+    override def readBatch: F[Vector[Record]] = {
       val poll = readSql
         .query[Record]
         .to[Vector]
@@ -122,9 +123,7 @@ object PgReader {
           else ().pure[F]
         }
 
-      val pollStream = Stream.eval(poll).flatMap(Stream.emits)
-
-      Stream.eval(logger.trace("read batch")) >> pollStream
+      logger.trace("read batch") >> poll
     }
 
     override def commitSlot(lsn: String): F[Unit] = {
