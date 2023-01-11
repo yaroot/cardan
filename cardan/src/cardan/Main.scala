@@ -55,7 +55,7 @@ object Main extends IOApp.Simple {
         .mapAsync(kBatchSize)(producer.send)
         .groupWithin(pgBatchSize, 100.millis)
         .evalMap {
-          _.last.traverse_(rep => pgReader.commitSlot(rep.passthrough))
+          _.last.map(_.passthrough).traverse_(pgReader.commitSlot)
         }
 
     source.through(sink)
