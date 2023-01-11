@@ -154,6 +154,7 @@ case class PgConfig(
   pool_size: Option[Int],             // defaults to 3
   max_lifetime_seconds: Option[Long], // defaults to 5 minutes
   idle_timeout_seconds: Option[Long], // defaults to 15 seconds
+  poll_interval_millis: Option[Long], // defaults to 200 millis
   batch_size: Int,
   batch_buffer: Int,
   slot_name: String,

@@ -12,6 +12,7 @@ import io.circe.Printer
 import io.circe.jawn as Jawn
 import fs2.Stream
 
+import scala.concurrent.duration.*
 import scala.util.chaining.*
 
 @JsonCodec
@@ -73,11 +74,12 @@ object PgReader {
 
   def apply[F[_]: PgReader]: PgReader[F] = implicitly
 
-  def apply[F[_]: MonadCancelThrow: LoggerFactory](config: PgConfig, xa: Transactor[F]): PgReader[F] = new PgReader[F] {
+  def apply[F[_]: Temporal: LoggerFactory](config: PgConfig, xa: Transactor[F]): PgReader[F] = new PgReader[F] {
     val logger = LoggerFactory[F].getLogger("pgreader")
 
-    val logicalSlot: String = config.slot_name
-    val dataSlot: String    = config.data_slot_name.getOrElse(s"${config.slot_name}_read")
+    val pollIntervalMs: FiniteDuration = config.poll_interval_millis.getOrElse(200L).millis
+    val logicalSlot: String            = config.slot_name
+    val dataSlot: String               = config.data_slot_name.getOrElse(s"${config.slot_name}_read")
 
     override def resetDataSlot: F[Unit] = {
       logger.info("Resetting data slot")
@@ -111,11 +113,18 @@ object PgReader {
     }
 
     override def readBatch: Stream[F, Record] = {
-      Stream.eval(logger.trace("read batch")) >>
-        readSql
-          .query[Record]
-          .stream
-          .transact(xa)
+      val poll = readSql
+        .query[Record]
+        .to[Vector]
+        .transact(xa)
+        .flatTap { xs =>
+          if (xs.isEmpty) Temporal[F].sleep(pollIntervalMs)
+          else ().pure[F]
+        }
+
+      val pollStream = Stream.eval(poll).flatMap(Stream.emits)
+
+      Stream.eval(logger.trace("read batch")) >> pollStream
     }
 
     override def commitSlot(lsn: String): F[Unit] = {
