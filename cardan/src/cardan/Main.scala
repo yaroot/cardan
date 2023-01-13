@@ -3,14 +3,11 @@ package cardan
 import cats.implicits.*
 import cats.effect.*
 import io.circe.generic.JsonCodec
-import doobie.hikari.HikariTransactor
-import doobie.util.ExecutionContexts
-import fs2.{Stream, Pipe}
+import fs2.{Chunk, Pipe, Stream}
 import io.circe.Json
 import org.apache.kafka.clients.producer.KafkaProducer
 
 import java.util
-import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.*
 
 object Main extends IOApp.Simple {
@@ -21,12 +18,16 @@ object Main extends IOApp.Simple {
     val fx = for {
       config       <- Stream.eval(readConfig)
       javaProducer <- Stream.resource(newKafkaProducer(config.kafka))
-      xa           <- Stream.resource(newPgPool(config.postgres))
-      pgReader      = PgReader[IO](config.postgres, xa)
+      pgConn        = PgStreamer.makePostgres[IO](config.postgres)
+      rawStream    <- Stream.resource(PgStreamer.makeLogicalStream(config.postgres, pgConn))
+      pgStreamer    = PgStreamer[IO](
+                        rawStream,
+                        config.postgres.batch_size,
+                        config.postgres.poll_interval_millis.getOrElse(10).millis
+                      )
       changeFilter  = ChangeFilter(config.topic)
-      _            <- Stream.eval(pgReader.resetDataSlot)
-      sink          = KafkaSink[IO, Json, CapturedValue, String](javaProducer)
-      _            <- flow(pgReader, sink, changeFilter, config)
+      sink          = KafkaSink[IO, Json, CapturedValue, Record.LSN](javaProducer)
+      _            <- flow(pgStreamer, sink, changeFilter, config)
     } yield ()
 
     fx.compile.drain
@@ -35,27 +36,28 @@ object Main extends IOApp.Simple {
   def configFile: IO[String] = IO.envForIO.get("CONFIG_FILE").map(_.getOrElse("./app.json"))
 
   def flow(
-    pgReader: PgReader[IO],
-    producer: KafkaSink[IO, Json, CapturedValue, String],
+    pgStreamer: PgStreamer[IO],
+    producer: KafkaSink[IO, Json, CapturedValue, Record.LSN],
     changeFilter: ChangeFilter,
     config: Configuration
   ): Stream[IO, Unit] = {
-    val kBatchSize  = config.kafka.batch_size
     val pgBatchSize = config.postgres.batch_buffer * config.postgres.batch_size
+    val kBatchConc  = (config.kafka.batch_size / pgBatchSize).max(5)
 
-    val source: Stream[IO, Record] = Stream
-      .eval(pgReader.readBatch)
+    val source: Stream[IO, Chunk[Record]] = Stream
+      .eval(pgStreamer.readBatch)
       .repeat
       .flatMap(Stream.emits)
-      .groupWithin(pgBatchSize, 10.millis)
-      .unchunks
+      .groupWithin(pgBatchSize, 50.millis)
 
-    val sink: Pipe[IO, Record, Unit] =
-      _.map(changeFilter.pass).unNone
-        .mapAsync(kBatchSize)(producer.send)
-        .groupWithin(pgBatchSize, 100.millis)
+    val sink: Pipe[IO, Chunk[Record], Unit] =
+      _.map(_.map(changeFilter.pass).unite)
+        .filter(_.nonEmpty)
+        .mapAsync(kBatchConc)(chunk => producer.sendBatch(chunk.toVector))
+        .map(_.lastOption.map(_.passthrough))
+        .groupWithin(kBatchConc, 50.millis)
         .evalMap {
-          _.last.map(_.passthrough).traverse_(pgReader.commitSlot)
+          _.last.flatten.traverse_(pgStreamer.commit)
         }
 
     source.through(sink)
@@ -98,32 +100,6 @@ object Main extends IOApp.Simple {
     }
   }
 
-  def newPgPool(c: PgConfig): Resource[IO, HikariTransactor[IO]] = {
-    val poolSize    = c.pool_size.getOrElse(3)
-    val maxLifetime = c.max_lifetime_seconds.getOrElse(5L * 60)
-    val idleTimeout = c.idle_timeout_seconds.getOrElse(15L)
-
-    for {
-      ce   <- ExecutionContexts.fixedThreadPool[IO](poolSize)
-      pool <- HikariTransactor.newHikariTransactor[IO](
-                driverClassName = "org.postgresql.Driver",
-                url             = c.url,
-                user            = c.user,
-                pass            = c.pass,
-                connectEC       = ce
-              )
-      _    <- Resource.eval {
-                pool.configure { h =>
-                  IO.delay {
-                    h.setMaxLifetime(TimeUnit.SECONDS.toMillis(maxLifetime))
-                    h.setIdleTimeout(TimeUnit.SECONDS.toMillis(idleTimeout))
-                    h.setMaximumPoolSize(poolSize)
-                    h.setMinimumIdle(0)
-                  }
-                }
-              }
-    } yield pool
-  }
 }
 
 @JsonCodec
@@ -152,15 +128,13 @@ case class PgConfig(
   url: String,
   user: String,
   pass: String,
-  numeric_as_string: Option[Boolean], // defaults to false
-  pool_size: Option[Int],             // defaults to 3
-  max_lifetime_seconds: Option[Long], // defaults to 5 minutes
-  idle_timeout_seconds: Option[Long], // defaults to 15 seconds
-  poll_interval_millis: Option[Long], // defaults to 200 millis
+  numeric_as_string: Option[Boolean],  // defaults to false
+  poll_interval_millis: Option[Int],   // defaults to 10 millis
+  commit_interval_millis: Option[Int], // defaults to 1000 millis
+  recv_buffer_size: Option[Int],       // defaults to 512k
   batch_size: Int,
   batch_buffer: Int,
-  slot_name: String,
-  data_slot_name: Option[String]      // defaults to {slot_name}_read
+  slot_name: String
 )
 
 @JsonCodec

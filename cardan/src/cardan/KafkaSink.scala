@@ -1,5 +1,6 @@
 package cardan
 
+import cats.implicits.*
 import cats.effect.*
 import io.circe.{Json, Printer}
 import org.apache.kafka.clients.producer.{Callback, Producer, ProducerRecord, RecordMetadata}
@@ -14,6 +15,7 @@ trait KafkaSink[F[_], K, V, P] {
   type Rep = Sent[P]
 
   def send(x: Rec): F[Rep]
+  def sendBatch(xs: Vector[Rec]): F[Vector[Rep]]
 }
 
 trait KVSerdes[A] {
@@ -47,14 +49,26 @@ object KafkaSink {
   case class Sent[P](passthrough: P, meta: RecordMetadata)
   case class ProduceRecord[K, V, P](topic: String, key: K, value: V, passthrough: P)
 
-  def apply[F[_]: Async, K: KVSerdes, V: KVSerdes, P](
+  def apply[F[_]: Async: LoggerFactory, K: KVSerdes, V: KVSerdes, P](
     producer: Producer[Bytes, Bytes]
   ): KafkaSink[F, K, V, P] =
     new KafkaSink[F, K, V, P] {
+      val logger = LoggerFactory[F].getLogger("KafkaSink")
 
       def send(x: Rec): F[Rep] = {
         val fx = Async[F].delay(unsafeSend(x))
         Async[F].fromFuture(fx)
+      }
+
+      def sendBatch(xs: Vector[Rec]): F[Vector[Rep]] = {
+        logger.info(s"Sending ${xs.size} msgs") >>
+          Async[F].executionContext.flatMap { implicit ec =>
+            Async[F].fromFuture {
+              Async[F].delay {
+                Future.traverse(xs)(unsafeSend)
+              }
+            }
+          }
       }
 
       def unsafeSend(x: Rec): Future[Rep] = {

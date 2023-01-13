@@ -25,7 +25,7 @@ object CapturedValue {
 trait ChangeFilter {
   type Key         = Json
   type Value       = CapturedValue
-  type Passthrough = String
+  type Passthrough = Record.LSN
 
   def pass(x: Record): Option[ProduceRecord[Key, Value, Passthrough]]
 }
