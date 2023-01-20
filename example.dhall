@@ -9,7 +9,6 @@
 , kafka =
   { bootstrap = [ "localhost:9092" ]
   , batch_size = 100 * 1000
-  , acks = "all"
   }
 , topic.prefix = "localdb-cdc"
 }
