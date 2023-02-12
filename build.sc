@@ -6,7 +6,7 @@ import mill.scalalib.scalafmt.ScalafmtModule
 val CatsEffectVersion  = "3.4.4"
 val CirceVersion       = "0.14.3"
 val DoobieVersion      = "1.0.0-RC2"
-val FS2Version         = "3.4.0"
+val FS2Version         = "3.6.1"
 val HikariCPVersion    = "5.0.1"
 val KafkaVersion       = "3.3.1"
 val Log4CatsVersion    = "2.5.0"
