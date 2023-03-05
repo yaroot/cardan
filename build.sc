@@ -4,7 +4,7 @@ import mill.define._
 import mill.scalalib.scalafmt.ScalafmtModule
 
 val CatsEffectVersion  = "3.4.4"
-val CirceVersion       = "0.14.3"
+val CirceVersion       = "0.14.5"
 val DoobieVersion      = "1.0.0-RC2"
 val FS2Version         = "3.4.0"
 val HikariCPVersion    = "5.0.1"
