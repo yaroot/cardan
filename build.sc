@@ -4,16 +4,16 @@ import mill.define._
 import mill.scalalib.scalafmt.ScalafmtModule
 
 val CatsEffectVersion  = "3.4.4"
-val CirceVersion       = "0.14.3"
+val CirceVersion       = "0.14.5"
 val DoobieVersion      = "1.0.0-RC2"
 val FS2Version         = "3.4.0"
 val HikariCPVersion    = "5.0.1"
-val KafkaVersion       = "3.3.1"
+val KafkaVersion       = "3.4.0"
 val Log4CatsVersion    = "2.5.0"
-val LogbackVersion     = "1.4.5"
+val LogbackVersion     = "1.4.7"
 val MUnitVersion       = "0.7.29"
-val PostgresqlVersion  = "42.5.1"
-val WartremoverVersion = "3.0.8"
+val PostgresqlVersion  = "42.6.0"
+val WartremoverVersion = "3.0.14"
 
 val ScalaVersion = "2.13.10"
 
