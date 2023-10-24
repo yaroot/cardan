@@ -124,8 +124,8 @@ trait CommonScalaModule extends ScalaModule with ScalafmtModule {
 
 object cardan extends CommonScalaModule {
   override def scalacOptions: T[Seq[String]] = T(Shared.scalacOptions)
-  override def compileIvyDeps                     = T(Shared.Deps.wartremover)
-  override def scalacPluginIvyDeps                = T(Shared.Deps.wartremover)
+  override def compileIvyDeps                = T(Shared.Deps.wartremover)
+  override def scalacPluginIvyDeps           = T(Shared.Deps.wartremover)
 
   override def mainClass: T[Option[String]] = T(Some("cardan.Main"))
 
