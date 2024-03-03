@@ -14,7 +14,7 @@ val MUnitVersion       = "0.7.29"
 val PostgresqlVersion  = "42.7.1"
 val WartremoverVersion = "3.1.5"
 
-val ScalaVersion = "2.13.12"
+val ScalaVersion = "2.13.13"
 
 object Shared {
   object Deps {
