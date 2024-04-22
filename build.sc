@@ -2,19 +2,19 @@ import mill._
 import mill.scalalib._
 import mill.scalalib.scalafmt.ScalafmtModule
 
-val CatsEffectVersion  = "3.5.2"
+val CatsEffectVersion  = "3.5.4"
 val CirceVersion       = "0.14.6"
 val DoobieVersion      = "1.0.0-RC5"
-val FS2Version         = "3.9.3"
+val FS2Version         = "3.9.4"
 val HikariCPVersion    = "5.1.0"
-val KafkaVersion       = "3.6.0"
+val KafkaVersion       = "3.7.0"
 val Log4CatsVersion    = "2.6.0"
-val LogbackVersion     = "1.4.11"
+val LogbackVersion     = "1.5.6"
 val MUnitVersion       = "0.7.29"
-val PostgresqlVersion  = "42.6.0"
-val WartremoverVersion = "3.1.5"
+val PostgresqlVersion  = "42.7.3"
+val WartremoverVersion = "3.1.6"
 
-val ScalaVersion = "2.13.12"
+val ScalaVersion = "2.13.13"
 
 object Shared {
   object Deps {
