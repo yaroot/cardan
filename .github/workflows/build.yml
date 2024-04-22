@@ -16,7 +16,7 @@ jobs:
         ./millw cardan.compile
         ./millw cardan.assembly
         mv out/cardan/assembly.dest/out.jar cardan.assembly.jar
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: assembly
         path: cardan.assembly.jar
